@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Finance Tracker | Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --accent: #e8a33d;
+      --success: #3f8f6f;
+      --danger: #c1503f;
+      --bg: #121214;
+      --panel: #18181b;
+      --border: #2a2a2e;
+      --border-hover: #3a3a3f;
+      --text: #ececec;
+      --text-muted: #8c8c92;
+      --radius: 6px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Inter', 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 28px;
+      min-height: 100vh;
+    }
+    .container { max-width: 980px; margin: 0 auto; }
+
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 36px; flex-wrap: wrap; gap: 12px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+    .header h1 { margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 1.4rem; font-weight: 600; letter-spacing: -0.01em; display: flex; align-items: center; gap: 10px; }
+    .header h1::before { content: ''; display: inline-block; width: 8px; height: 8px; background: var(--accent); border-radius: 1px; }
+
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1px; margin-bottom: 24px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .stat-card { background: var(--panel); padding: 20px; }
+    .stat-label { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.08em; }
+    .stat-value { font-family: 'IBM Plex Mono', monospace; font-size: 1.6rem; font-weight: 600; margin-top: 8px; transition: opacity 0.2s ease; }
+    .stat-value.loading { opacity: 0.35; }
+    .stat-card.income .stat-value { color: var(--success); }
+    .stat-card.expense .stat-value { color: var(--danger); }
+
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; margin-bottom: 20px; }
+    .card h3 { margin: 0 0 18px; font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 0.95rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+
+    .form-group { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-start; }
+    .field { flex: 1; min-width: 150px; display: flex; flex-direction: column; }
+    input, select {
+      padding: 10px 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 0.9rem;
+      width: 100%;
+      color: var(--text);
+      font-family: inherit;
+      transition: border-color 0.12s ease;
+    }
+    input::placeholder { color: var(--text-muted); }
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    input.invalid { border-color: var(--danger); }
+    select option { background: var(--panel); color: var(--text); }
+    .field-error { color: var(--danger); font-size: 0.75rem; margin-top: 5px; min-height: 1em; }
+
+    button {
+      background: var(--accent);
+      color: #1a1408;
+      border: 1px solid var(--accent);
+      padding: 10px 18px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.88rem;
+      font-family: inherit;
+      transition: background 0.12s ease, opacity 0.12s ease;
+      white-space: nowrap;
+    }
+    button:hover:not(:disabled) { background: #f0b256; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    button.delete-btn { background: transparent; color: var(--danger); border: 1px solid var(--border); padding: 6px 12px; font-size: 0.78rem; }
+    button.delete-btn:hover:not(:disabled) { border-color: var(--danger); background: rgba(193,80,63,0.08); }
+    button.link-btn { background: none; color: var(--accent); border: none; padding: 0; font-weight: 500; text-decoration: underline; }
+    button.link-btn:hover:not(:disabled) { background: none; opacity: 0.8; }
+    button.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    button.secondary:hover:not(:disabled) { border-color: var(--border-hover); background: rgba(255,255,255,0.03); }
+    button.danger-solid { background: var(--danger); border-color: var(--danger); color: #fff; }
+    button.danger-solid:hover:not(:disabled) { background: #d1604d; }
+
+    .table-wrap { overflow-x: auto; margin-top: 8px; border: 1px solid var(--border); border-radius: var(--radius); }
+    table { width: 100%; border-collapse: collapse; min-width: 520px; }
+    th { text-align: left; background: transparent; padding: 12px 14px; font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; border-bottom: 1px solid var(--border); }
+    td { padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
+    tr:last-child td { border-bottom: none; }
+    tr.new-row td { animation: highlight 1.4s ease; }
+    @keyframes highlight { from { background: rgba(232,163,61,0.12); } to { background: transparent; } }
+
+    .badge { padding: 3px 9px; border-radius: 3px; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.03em; border: 1px solid; }
+    .badge-income { color: var(--success); border-color: rgba(63,143,111,0.4); background: rgba(63,143,111,0.08); }
+    .badge-expense { color: var(--danger); border-color: rgba(193,80,63,0.4); background: rgba(193,80,63,0.08); }
+
+    .empty-state { text-align: center; padding: 44px 20px; color: var(--text-muted); font-size: 0.9rem; }
+    .empty-state .icon { font-size: 1.8rem; margin-bottom: 10px; opacity: 0.5; }
+
+    .auth-box { max-width: 360px; margin: 90px auto; padding: 30px; }
+    .auth-box h2 { font-family: 'Space Grotesk', sans-serif; font-weight: 600; margin: 0 0 20px; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+    .auth-box h2::before { content: ''; display: inline-block; width: 8px; height: 8px; background: var(--accent); border-radius: 1px; }
+    .auth-box .field { margin-bottom: 12px; }
+    .auth-box .auth-submit { width: 100%; padding: 11px; }
+    .error-text { color: var(--danger); font-size: 0.82rem; margin-top: 8px; min-height: 1em; }
+    .hidden { display: none !important; }
+
+    .toast-container { position: fixed; bottom: 22px; right: 22px; display: flex; flex-direction: column; gap: 8px; z-index: 1000; }
+    .toast {
+      background: var(--panel); color: var(--text); padding: 12px 18px; border-radius: var(--radius);
+      font-size: 0.85rem; border: 1px solid var(--border); border-left: 3px solid var(--accent);
+      animation: toast-in 0.2s ease; max-width: 300px;
+    }
+    .toast.success { border-left-color: var(--success); }
+    .toast.error { border-left-color: var(--danger); }
+    @keyframes toast-in { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: translateX(0); } }
+
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 999; }
+    .modal-box { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; max-width: 340px; width: 90%; }
+    .modal-box h4 { margin: 0 0 6px; font-family: 'Space Grotesk', sans-serif; font-weight: 600; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+    .spinner {
+      display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(26,20,8,0.3);
+      border-top-color: #1a1408; border-radius: 50%; animation: spin 0.6s linear infinite; margin-right: 6px; vertical-align: -1px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 640px) {
+      body { padding: 14px; }
+      .card { padding: 18px; }
+      .form-group { flex-direction: column; }
+      .field { min-width: 0; }
+      .form-group button { width: 100%; }
+      .auth-box { margin: 50px auto; padding: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <div id="auth-view" class="auth-box card">
+      <h2 id="auth-title">Log in</h2>
+      <div class="field">
+        <input type="text" id="auth-username" placeholder="Username" autocomplete="username">
+      </div>
+      <div class="field">
+        <input type="password" id="auth-password" placeholder="Password" autocomplete="current-password">
+      </div>
+      <button id="auth-submit-btn" class="auth-submit" onclick="submitAuth()">Log in</button>
+      <div id="auth-error" class="error-text"></div>
+      <p style="margin-top:14px; font-size:0.85rem; color:var(--text-muted);">
+        <span id="auth-toggle-text">Don't have an account?</span>
+        <button class="link-btn" onclick="toggleAuthMode()">Sign up</button>
+      </p>
+    </div>
+
+    <div id="dashboard-view" class="hidden">
+      <div class="header">
+        <h1>Finance Tracker</h1>
+        <span style="display:flex; align-items:center; gap:14px;">
+          <span id="user-badge" style="color:var(--text-muted); font-size:0.85rem; font-family:'IBM Plex Mono',monospace;"></span>
+          <button class="link-btn" onclick="logout()">Log out</button>
+        </span>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card income">
+          <div class="stat-label">Total Income</div>
+          <div class="stat-value" id="total-income">₹0</div>
+        </div>
+        <div class="stat-card expense">
+          <div class="stat-label">Total Expenses</div>
+          <div class="stat-value" id="total-expense">₹0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Current Balance</div>
+          <div class="stat-value" id="balance">₹0</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Add new transaction</h3>
+        <div class="form-group">
+          <div class="field">
+            <input type="number" id="amount" placeholder="Amount (₹)" min="0" step="0.01">
+            <div class="field-error" id="amount-error"></div>
+          </div>
+          <div class="field">
+            <select id="type">
+              <option value="income">Income</option>
+              <option value="expense">Expense</option>
+            </select>
+          </div>
+          <div class="field">
+            <input type="text" id="category" placeholder="Category (e.g., Salary, Rent)">
+            <div class="field-error" id="category-error"></div>
+          </div>
+          <button id="save-btn" onclick="addTransaction()">Save record</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Recent activity</h3>
+        <div class="table-wrap">
+          <table id="transaction-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Category</th>
+                <th>Type</th>
+                <th>Amount</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="transaction-list"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="toast-container" id="toast-container"></div>
+
+  <script>
+    const API_URL = '/api/transactions';
+    const ANALYTICS_URL = '/api/analytics/summary';
+    let authMode = 'login';
+    let lastAddedId = null;
+    let pendingDeleteId = null;
+
+    function getToken() { return localStorage.getItem('token'); }
+    function authHeaders() {
+      return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` };
+    }
+
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.innerText = message;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    }
+
+    function setButtonLoading(btn, isLoading, loadingText, defaultText) {
+      btn.disabled = isLoading;
+      btn.innerHTML = isLoading ? `<span class="spinner"></span>${loadingText}` : defaultText;
+    }
+
+    function toggleAuthMode() {
+      authMode = authMode === 'login' ? 'signup' : 'login';
+      document.getElementById('auth-title').innerText = authMode === 'login' ? 'Log in' : 'Sign up';
+      document.getElementById('auth-submit-btn').innerText = authMode === 'login' ? 'Log in' : 'Sign up';
+      document.getElementById('auth-toggle-text').innerText = authMode === 'login' ? "Don't have an account?" : "Already have an account?";
+      document.querySelector('#auth-view .link-btn').innerText = authMode === 'login' ? 'Sign up' : 'Log in';
+      document.getElementById('auth-error').innerText = '';
+    }
+
+    async function submitAuth() {
+      const username = document.getElementById('auth-username').value.trim();
+      const password = document.getElementById('auth-password').value;
+      const errorEl = document.getElementById('auth-error');
+      const submitBtn = document.getElementById('auth-submit-btn');
+      errorEl.innerText = '';
+
+      if (!username || !password) {
+        errorEl.innerText = 'Enter a username and password.';
+        return;
+      }
+
+      const defaultLabel = authMode === 'login' ? 'Log in' : 'Sign up';
+      setButtonLoading(submitBtn, true, 'Please wait...', defaultLabel);
+
+      try {
+        if (authMode === 'signup') {
+          const res = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+          });
+          if (!res.ok) {
+            const err = await res.json();
+            errorEl.innerText = err.detail || 'Registration failed.';
+            return;
+          }
+        }
+
+        const form = new URLSearchParams();
+        form.append('username', username);
+        form.append('password', password);
+
+        const loginRes = await fetch('/api/auth/login', { method: 'POST', body: form });
+        if (!loginRes.ok) {
+          errorEl.innerText = 'Incorrect username or password.';
+          return;
+        }
+
+        const data = await loginRes.json();
+        localStorage.setItem('token', data.access_token);
+        localStorage.setItem('username', username);
+        showDashboard();
+      } catch (e) {
+        errorEl.innerText = 'Network error. Please try again.';
+      } finally {
+        setButtonLoading(submitBtn, false, '', defaultLabel);
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem('token');
+      localStorage.removeItem('username');
+      document.getElementById('dashboard-view').classList.add('hidden');
+      document.getElementById('auth-view').classList.remove('hidden');
+      document.getElementById('auth-username').value = '';
+      document.getElementById('auth-password').value = '';
+    }
+
+    function showDashboard() {
+      document.getElementById('auth-view').classList.add('hidden');
+      document.getElementById('dashboard-view').classList.remove('hidden');
+      document.getElementById('user-badge').innerText = localStorage.getItem('username');
+      updateDashboard();
+    }
+
+    function setStatsLoading(isLoading) {
+      ['total-income', 'total-expense', 'balance'].forEach(id => {
+        document.getElementById(id).classList.toggle('loading', isLoading);
+      });
+    }
+
+    async function updateDashboard() {
+      setStatsLoading(true);
+      try {
+        const analyticsRes = await fetch(ANALYTICS_URL, { headers: authHeaders() });
+        if (analyticsRes.status === 401) { logout(); return; }
+        const stats = await analyticsRes.json();
+        document.getElementById('total-income').innerText = `₹${stats.total_income.toLocaleString()}`;
+        document.getElementById('total-expense').innerText = `₹${stats.total_expense.toLocaleString()}`;
+        document.getElementById('balance').innerText = `₹${stats.balance.toLocaleString()}`;
+
+        const listRes = await fetch(API_URL, { headers: authHeaders() });
+        const transactions = await listRes.json();
+        const tbody = document.getElementById('transaction-list');
+
+        if (transactions.length === 0) {
+          tbody.innerHTML = `
+            <tr><td colspan="5">
+              <div class="empty-state">
+                <div class="icon">—</div>
+                No transactions yet. Add your first record above.
+              </div>
+            </td></tr>`;
+        } else {
+          tbody.innerHTML = transactions.slice().reverse().map(t => `
+            <tr class="${t.id === lastAddedId ? 'new-row' : ''}">
+              <td>${new Date(t.date).toLocaleDateString('en-IN')}</td>
+              <td>${t.category}</td>
+              <td><span class="badge ${t.type === 'income' ? 'badge-income' : 'badge-expense'}">${t.type.toUpperCase()}</span></td>
+              <td>₹${t.amount.toLocaleString()}</td>
+              <td><button class="delete-btn" onclick="confirmDelete(${t.id})">Delete</button></td>
+            </tr>
+          `).join('');
+        }
+        lastAddedId = null;
+      } catch (e) {
+        showToast('Could not load your data. Check your connection.', 'error');
+      } finally {
+        setStatsLoading(false);
+      }
+    }
+
+    function validateTransactionForm(amount, category) {
+      let valid = true;
+      const amountInput = document.getElementById('amount');
+      const categoryInput = document.getElementById('category');
+      const amountError = document.getElementById('amount-error');
+      const categoryError = document.getElementById('category-error');
+
+      amountInput.classList.remove('invalid');
+      categoryInput.classList.remove('invalid');
+      amountError.innerText = '';
+      categoryError.innerText = '';
+
+      if (isNaN(amount) || amount <= 0) {
+        amountError.innerText = 'Enter an amount greater than 0.';
+        amountInput.classList.add('invalid');
+        valid = false;
+      }
+      if (!category) {
+        categoryError.innerText = 'Category is required.';
+        categoryInput.classList.add('invalid');
+        valid = false;
+      }
+      return valid;
+    }
+
+    async function addTransaction() {
+      const amount = parseFloat(document.getElementById('amount').value);
+      const category = document.getElementById('category').value.trim();
+      const type = document.getElementById('type').value;
+
+      if (!validateTransactionForm(amount, category)) return;
+
+      const saveBtn = document.getElementById('save-btn');
+      setButtonLoading(saveBtn, true, 'Saving...', 'Save record');
+
+      try {
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({ amount, type, category })
+        });
+
+        if (res.ok) {
+          const created = await res.json();
+          lastAddedId = created.id;
+          document.getElementById('amount').value = '';
+          document.getElementById('category').value = '';
+          showToast('Transaction saved.');
+          updateDashboard();
+        } else {
+          showToast('Could not save transaction. Check your input.', 'error');
+        }
+      } catch (e) {
+        showToast('Network error. Please try again.', 'error');
+      } finally {
+        setButtonLoading(saveBtn, false, '', 'Save record');
+      }
+    }
+
+    function confirmDelete(id) {
+      pendingDeleteId = id;
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.id = 'confirm-modal';
+      overlay.innerHTML = `
+        <div class="modal-box">
+          <h4>Delete this record?</h4>
+          <p style="color:var(--text-muted); font-size:0.85rem;">This can't be undone.</p>
+          <div class="modal-actions">
+            <button class="secondary" onclick="closeConfirmModal()">Cancel</button>
+            <button class="danger-solid" id="confirm-delete-btn" onclick="deleteTransaction()">Delete</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+    }
+
+    function closeConfirmModal() {
+      const modal = document.getElementById('confirm-modal');
+      if (modal) modal.remove();
+      pendingDeleteId = null;
+    }
+
+    async function deleteTransaction() {
+      const id = pendingDeleteId;
+      const btn = document.getElementById('confirm-delete-btn');
+      setButtonLoading(btn, true, 'Deleting...', 'Delete');
+      try {
+        await fetch(`${API_URL}/${id}`, { method: 'DELETE', headers: authHeaders() });
+        showToast('Transaction deleted.');
+        closeConfirmModal();
+        updateDashboard();
+      } catch (e) {
+        showToast('Could not delete transaction.', 'error');
+        setButtonLoading(btn, false, '', 'Delete');
+      }
+    }
+
+    document.getElementById('auth-password').addEventListener('keydown', e => {
+      if (e.key === 'Enter') submitAuth();
+    });
+    document.getElementById('category').addEventListener('keydown', e => {
+      if (e.key === 'Enter') addTransaction();
+    });
+
+    if (getToken()) {
+      showDashboard();
+    }
+  </script>
+</body>
+</html>

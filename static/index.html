@@ -26,10 +26,26 @@
       background: var(--bg);
       color: var(--text);
       margin: 0;
-      padding: 28px;
       min-height: 100vh;
     }
-    .container { max-width: 980px; margin: 0 auto; }
+    .container { max-width: 980px; margin: 0 auto; padding: 28px; }
+
+    .auth-screen { position: fixed; inset: 0; display: flex; background: var(--bg); }
+    .auth-empty-panel { flex: 1; }
+    .auth-form-panel {
+      width: 420px;
+      max-width: 100vw;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+      background: var(--panel);
+      border-left: 1px solid var(--border);
+    }
+    @media (max-width: 640px) {
+      .auth-empty-panel { display: none; }
+      .auth-form-panel { width: 100%; border-left: none; }
+    }
 
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 36px; flex-wrap: wrap; gap: 12px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
     .header h1 { margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 1.4rem; font-weight: 600; letter-spacing: -0.01em; display: flex; align-items: center; gap: 10px; }
@@ -108,7 +124,7 @@
     .empty-state { text-align: center; padding: 44px 20px; color: var(--text-muted); font-size: 0.9rem; }
     .empty-state .icon { font-size: 1.8rem; margin-bottom: 10px; opacity: 0.5; }
 
-    .auth-box { max-width: 360px; margin: 90px auto; padding: 30px; }
+    .auth-box { width: 100%; max-width: 300px; }
     .auth-box h2 { font-family: 'Space Grotesk', sans-serif; font-weight: 600; margin: 0 0 20px; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
     .auth-box h2::before { content: ''; display: inline-block; width: 8px; height: 8px; background: var(--accent); border-radius: 1px; }
     .auth-box .field { margin-bottom: 12px; }
@@ -126,7 +142,7 @@
     .toast.error { border-left-color: var(--danger); }
     @keyframes toast-in { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: translateX(0); } }
 
-    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 999; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1500; }
     .modal-box { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; max-width: 340px; width: 90%; }
     .modal-box h4 { margin: 0 0 6px; font-family: 'Space Grotesk', sans-serif; font-weight: 600; }
     .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
@@ -138,34 +154,37 @@
     @keyframes spin { to { transform: rotate(360deg); } }
 
     @media (max-width: 640px) {
-      body { padding: 14px; }
       .card { padding: 18px; }
       .form-group { flex-direction: column; }
       .field { min-width: 0; }
       .form-group button { width: 100%; }
-      .auth-box { margin: 50px auto; padding: 24px; }
     }
   </style>
 </head>
 <body>
-  <div class="container">
 
-    <div id="auth-view" class="auth-box card">
-      <h2 id="auth-title">Log in</h2>
-      <div class="field">
-        <input type="text" id="auth-username" placeholder="Username" autocomplete="username">
+  <div id="auth-screen" class="auth-screen">
+    <div class="auth-empty-panel"></div>
+    <div class="auth-form-panel">
+      <div id="auth-view" class="auth-box">
+        <h2 id="auth-title">Log in</h2>
+        <div class="field">
+          <input type="text" id="auth-username" placeholder="Username" autocomplete="username">
+        </div>
+        <div class="field">
+          <input type="password" id="auth-password" placeholder="Password" autocomplete="current-password">
+        </div>
+        <button id="auth-submit-btn" class="auth-submit" onclick="submitAuth()">Log in</button>
+        <div id="auth-error" class="error-text"></div>
+        <p style="margin-top:14px; font-size:0.85rem; color:var(--text-muted);">
+          <span id="auth-toggle-text">Don't have an account?</span>
+          <button class="link-btn" onclick="toggleAuthMode()">Sign up</button>
+        </p>
       </div>
-      <div class="field">
-        <input type="password" id="auth-password" placeholder="Password" autocomplete="current-password">
-      </div>
-      <button id="auth-submit-btn" class="auth-submit" onclick="submitAuth()">Log in</button>
-      <div id="auth-error" class="error-text"></div>
-      <p style="margin-top:14px; font-size:0.85rem; color:var(--text-muted);">
-        <span id="auth-toggle-text">Don't have an account?</span>
-        <button class="link-btn" onclick="toggleAuthMode()">Sign up</button>
-      </p>
     </div>
+  </div>
 
+  <div class="container">
     <div id="dashboard-view" class="hidden">
       <div class="header">
         <h1>Finance Tracker</h1>
@@ -229,7 +248,6 @@
         </div>
       </div>
     </div>
-
   </div>
 
   <div class="toast-container" id="toast-container"></div>
@@ -322,14 +340,14 @@
     function logout() {
       localStorage.removeItem('token');
       localStorage.removeItem('username');
+      document.getElementById('auth-screen').classList.remove('hidden');
       document.getElementById('dashboard-view').classList.add('hidden');
-      document.getElementById('auth-view').classList.remove('hidden');
       document.getElementById('auth-username').value = '';
       document.getElementById('auth-password').value = '';
     }
 
     function showDashboard() {
-      document.getElementById('auth-view').classList.add('hidden');
+      document.getElementById('auth-screen').classList.add('hidden');
       document.getElementById('dashboard-view').classList.remove('hidden');
       document.getElementById('user-badge').innerText = localStorage.getItem('username');
       updateDashboard();

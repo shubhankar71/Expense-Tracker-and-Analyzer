@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <style>
     :root {
       --accent: #e8a33d;
@@ -80,7 +81,7 @@
       outline: none;
       border-color: var(--accent);
     }
-    input.invalid { border-color: var(--danger); }
+    input.invalid, select.invalid { border-color: var(--danger); }
     select option { background: var(--panel); color: var(--text); }
     .field-error { color: var(--danger); font-size: 0.75rem; margin-top: 5px; min-height: 1em; }
 
@@ -153,8 +154,18 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+    .chart-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; }
+    .chart-card h3 { margin: 0 0 18px; font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 0.95rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .chart-wrap { position: relative; height: 260px; }
+    .chart-empty { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 0.85rem; }
+
+    .review-text { color: var(--text-muted); font-size: 0.9rem; line-height: 1.5; }
+    .review-heading { margin: 14px 0 6px; font-family: 'Space Grotesk', sans-serif; color: var(--text); font-size: 0.95rem; }
+    .review-heading:first-child { margin-top: 0; }
+
     @media (max-width: 640px) {
-      .card { padding: 18px; }
+      .card, .chart-card { padding: 18px; }
       .form-group { flex-direction: column; }
       .field { min-width: 0; }
       .form-group button { width: 100%; }
@@ -168,8 +179,11 @@
     <div class="auth-form-panel">
       <div id="auth-view" class="auth-box">
         <h2 id="auth-title">Log in</h2>
+        <div class="field hidden" id="email-field">
+          <input type="email" id="auth-email" placeholder="Email" autocomplete="email">
+        </div>
         <div class="field">
-          <input type="text" id="auth-username" placeholder="Username" autocomplete="username">
+          <input type="text" id="auth-username" placeholder="Username or email" autocomplete="username">
         </div>
         <div class="field">
           <input type="password" id="auth-password" placeholder="Password" autocomplete="current-password">
@@ -179,6 +193,35 @@
         <p style="margin-top:14px; font-size:0.85rem; color:var(--text-muted);">
           <span id="auth-toggle-text">Don't have an account?</span>
           <button class="link-btn" onclick="toggleAuthMode()">Sign up</button>
+        </p>
+        <p id="forgot-password-link" style="margin-top:6px; font-size:0.85rem;">
+          <button class="link-btn" onclick="showForgotPassword()">Forgot password?</button>
+        </p>
+      </div>
+
+      <div id="forgot-view" class="auth-box hidden">
+        <h2>Reset password</h2>
+
+        <div id="forgot-step-email">
+          <div class="field">
+            <input type="email" id="forgot-email" placeholder="Your account email" autocomplete="email">
+          </div>
+          <button class="auth-submit" onclick="sendResetOtp()">Send reset code</button>
+        </div>
+
+        <div id="forgot-step-otp" class="hidden">
+          <div class="field">
+            <input type="text" id="reset-otp" placeholder="6-digit code" maxlength="6" inputmode="numeric">
+          </div>
+          <div class="field">
+            <input type="password" id="reset-new-password" placeholder="New password" autocomplete="new-password">
+          </div>
+          <button class="auth-submit" onclick="submitResetPassword()">Reset password</button>
+        </div>
+
+        <div id="forgot-error" class="error-text"></div>
+        <p style="margin-top:14px; font-size:0.85rem;">
+          <button class="link-btn" onclick="showLoginFromForgot()">Back to log in</button>
         </p>
       </div>
     </div>
@@ -217,13 +260,13 @@
             <div class="field-error" id="amount-error"></div>
           </div>
           <div class="field">
-            <select id="type">
+            <select id="type" onchange="onTypeChange()">
               <option value="income">Income</option>
               <option value="expense">Expense</option>
             </select>
           </div>
           <div class="field">
-            <input type="text" id="category" placeholder="Category (e.g., Salary, Rent)">
+            <select id="category"></select>
             <div class="field-error" id="category-error"></div>
           </div>
           <button id="save-btn" onclick="addTransaction()">Save record</button>
@@ -247,6 +290,48 @@
           </table>
         </div>
       </div>
+
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h3>Income vs Expense</h3>
+          <div class="chart-wrap">
+            <canvas id="income-expense-chart"></canvas>
+            <div id="income-expense-empty" class="chart-empty hidden">No data to chart yet.</div>
+          </div>
+        </div>
+        <div class="chart-card">
+          <h3>Expense by Category</h3>
+          <div class="chart-wrap">
+            <canvas id="category-chart"></canvas>
+            <div id="category-empty" class="chart-empty hidden">No expenses to chart yet.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Weekly Financial Review</h3>
+        <div class="form-group">
+          <div class="field">
+            <select id="review-period">
+              <option value="last_week">Last week</option>
+              <option value="past_2_weeks">Past 2 weeks</option>
+              <option value="past_4_weeks">Past 4 weeks</option>
+              <option value="past_12_weeks">Past 12 weeks</option>
+            </select>
+          </div>
+          <button id="generate-review-btn" onclick="generateReview()">Generate Review</button>
+        </div>
+
+        <div id="review-result" class="hidden" style="margin-top:18px;">
+          <h4 class="review-heading">Expense Review</h4>
+          <p id="review-expense" class="review-text"></p>
+          <h4 class="review-heading">Income Review</h4>
+          <p id="review-income" class="review-text"></p>
+          <h4 class="review-heading">Savings & Sustainability Advice</h4>
+          <p id="review-savings" class="review-text"></p>
+          <button id="download-pdf-btn" class="secondary" style="margin-top:10px;" onclick="downloadReviewPdf()">Download PDF</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -255,9 +340,18 @@
   <script>
     const API_URL = '/api/transactions';
     const ANALYTICS_URL = '/api/analytics/summary';
+    const REVIEW_GENERATE_URL = '/api/reviews/generate';
     let authMode = 'login';
     let lastAddedId = null;
     let pendingDeleteId = null;
+    let incomeExpenseChart = null;
+    let categoryChart = null;
+    let currentReviewId = null;
+
+    const INCOME_CATEGORIES = ['Salary'];
+    const EXPENSE_CATEGORIES = ['Rent', 'Grocery', 'Travel Cost', 'Vehicle Repair', 'Health + Medication', 'Other'];
+
+    const CHART_COLORS = ['#e8a33d', '#3f8f6f', '#c1503f', '#5b8dd6', '#9b7fd4', '#d4a5c9', '#6fb1a0', '#c98f4f'];
 
     function getToken() { return localStorage.getItem('token'); }
     function authHeaders() {
@@ -278,6 +372,21 @@
       btn.innerHTML = isLoading ? `<span class="spinner"></span>${loadingText}` : defaultText;
     }
 
+    function populateCategoryOptions() {
+      const type = document.getElementById('type').value;
+      const categorySelect = document.getElementById('category');
+      const options = type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+
+      categorySelect.innerHTML = '<option value="">Select category</option>' +
+        options.map(c => `<option value="${c}">${c}</option>`).join('');
+    }
+
+    function onTypeChange() {
+      populateCategoryOptions();
+      document.getElementById('category-error').innerText = '';
+      document.getElementById('category').classList.remove('invalid');
+    }
+
     function toggleAuthMode() {
       authMode = authMode === 'login' ? 'signup' : 'login';
       document.getElementById('auth-title').innerText = authMode === 'login' ? 'Log in' : 'Sign up';
@@ -285,17 +394,25 @@
       document.getElementById('auth-toggle-text').innerText = authMode === 'login' ? "Don't have an account?" : "Already have an account?";
       document.querySelector('#auth-view .link-btn').innerText = authMode === 'login' ? 'Sign up' : 'Log in';
       document.getElementById('auth-error').innerText = '';
+      document.getElementById('email-field').classList.toggle('hidden', authMode === 'login');
+      document.getElementById('auth-username').placeholder = authMode === 'login' ? 'Username or email' : 'Username';
+      document.getElementById('auth-email').value = '';
     }
 
     async function submitAuth() {
-      const username = document.getElementById('auth-username').value.trim();
+      const identifier = document.getElementById('auth-username').value.trim();
+      const email = document.getElementById('auth-email').value.trim();
       const password = document.getElementById('auth-password').value;
       const errorEl = document.getElementById('auth-error');
       const submitBtn = document.getElementById('auth-submit-btn');
       errorEl.innerText = '';
 
-      if (!username || !password) {
-        errorEl.innerText = 'Enter a username and password.';
+      if (authMode === 'signup' && (!email || !identifier || !password)) {
+        errorEl.innerText = 'Enter an email, username, and password.';
+        return;
+      }
+      if (authMode === 'login' && (!identifier || !password)) {
+        errorEl.innerText = 'Enter your username/email and password.';
         return;
       }
 
@@ -307,7 +424,7 @@
           const res = await fetch('/api/auth/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
+            body: JSON.stringify({ email, username: identifier, password })
           });
           if (!res.ok) {
             const err = await res.json();
@@ -317,18 +434,18 @@
         }
 
         const form = new URLSearchParams();
-        form.append('username', username);
+        form.append('username', identifier);
         form.append('password', password);
 
         const loginRes = await fetch('/api/auth/login', { method: 'POST', body: form });
         if (!loginRes.ok) {
-          errorEl.innerText = 'Incorrect username or password.';
+          errorEl.innerText = 'Incorrect username/email or password.';
           return;
         }
 
         const data = await loginRes.json();
         localStorage.setItem('token', data.access_token);
-        localStorage.setItem('username', username);
+        localStorage.setItem('username', identifier);
         showDashboard();
       } catch (e) {
         errorEl.innerText = 'Network error. Please try again.';
@@ -344,12 +461,15 @@
       document.getElementById('dashboard-view').classList.add('hidden');
       document.getElementById('auth-username').value = '';
       document.getElementById('auth-password').value = '';
+      document.getElementById('auth-email').value = '';
+      showLoginFromForgot();
     }
 
     function showDashboard() {
       document.getElementById('auth-screen').classList.add('hidden');
       document.getElementById('dashboard-view').classList.remove('hidden');
       document.getElementById('user-badge').innerText = localStorage.getItem('username');
+      populateCategoryOptions();
       updateDashboard();
     }
 
@@ -357,6 +477,113 @@
       ['total-income', 'total-expense', 'balance'].forEach(id => {
         document.getElementById(id).classList.toggle('loading', isLoading);
       });
+    }
+
+    function renderIncomeExpenseChart(totalIncome, totalExpense) {
+      const canvas = document.getElementById('income-expense-chart');
+      const emptyEl = document.getElementById('income-expense-empty');
+
+      if (totalIncome === 0 && totalExpense === 0) {
+        canvas.classList.add('hidden');
+        emptyEl.classList.remove('hidden');
+        if (incomeExpenseChart) { incomeExpenseChart.destroy(); incomeExpenseChart = null; }
+        return;
+      }
+      canvas.classList.remove('hidden');
+      emptyEl.classList.add('hidden');
+
+      const data = {
+        labels: ['Income', 'Expense'],
+        datasets: [{
+          data: [totalIncome, totalExpense],
+          backgroundColor: ['#3f8f6f', '#c1503f'],
+          borderColor: '#18181b',
+          borderWidth: 2
+        }]
+      };
+
+      if (incomeExpenseChart) {
+        incomeExpenseChart.data = data;
+        incomeExpenseChart.update();
+      } else {
+        incomeExpenseChart = new Chart(canvas, {
+          type: 'pie',
+          data,
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'bottom', labels: { color: '#ececec', font: { family: 'Inter' } } },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => `${ctx.label}: ₹${ctx.parsed.toLocaleString()}`
+                }
+              }
+            }
+          }
+        });
+      }
+    }
+
+    function renderCategoryChart(transactions) {
+      const canvas = document.getElementById('category-chart');
+      const emptyEl = document.getElementById('category-empty');
+
+      // Only expense transactions — income (Salary) never appears in this chart.
+      const expenseTransactions = transactions.filter(t => t.type === 'expense');
+
+      const totalsByCategory = {};
+      expenseTransactions.forEach(t => {
+        totalsByCategory[t.category] = (totalsByCategory[t.category] || 0) + t.amount;
+      });
+
+      const labels = Object.keys(totalsByCategory);
+      const values = Object.values(totalsByCategory);
+
+      if (labels.length === 0) {
+        canvas.classList.add('hidden');
+        emptyEl.classList.remove('hidden');
+        if (categoryChart) { categoryChart.destroy(); categoryChart = null; }
+        return;
+      }
+      canvas.classList.remove('hidden');
+      emptyEl.classList.add('hidden');
+
+      const data = {
+        labels,
+        datasets: [{
+          data: values,
+          backgroundColor: labels.map((_, i) => CHART_COLORS[i % CHART_COLORS.length]),
+          borderColor: '#18181b',
+          borderWidth: 2
+        }]
+      };
+
+      if (categoryChart) {
+        categoryChart.data = data;
+        categoryChart.update();
+      } else {
+        categoryChart = new Chart(canvas, {
+          type: 'pie',
+          data,
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'bottom', labels: { color: '#ececec', font: { family: 'Inter' } } },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => {
+                    const total = values.reduce((a, b) => a + b, 0);
+                    const pct = total ? ((ctx.parsed / total) * 100).toFixed(1) : 0;
+                    return `${ctx.label}: ₹${ctx.parsed.toLocaleString()} (${pct}%)`;
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
     }
 
     async function updateDashboard() {
@@ -393,6 +620,9 @@
           `).join('');
         }
         lastAddedId = null;
+
+        renderIncomeExpenseChart(stats.total_income, stats.total_expense);
+        renderCategoryChart(transactions);
       } catch (e) {
         showToast('Could not load your data. Check your connection.', 'error');
       } finally {
@@ -418,7 +648,7 @@
         valid = false;
       }
       if (!category) {
-        categoryError.innerText = 'Category is required.';
+        categoryError.innerText = 'Please select a category.';
         categoryInput.classList.add('invalid');
         valid = false;
       }
@@ -446,7 +676,7 @@
           const created = await res.json();
           lastAddedId = created.id;
           document.getElementById('amount').value = '';
-          document.getElementById('category').value = '';
+          populateCategoryOptions();
           showToast('Transaction saved.');
           updateDashboard();
         } else {
@@ -494,6 +724,137 @@
       } catch (e) {
         showToast('Could not delete transaction.', 'error');
         setButtonLoading(btn, false, '', 'Delete');
+      }
+    }
+
+    function showForgotPassword() {
+      document.getElementById('auth-view').classList.add('hidden');
+      document.getElementById('forgot-view').classList.remove('hidden');
+      document.getElementById('forgot-step-email').classList.remove('hidden');
+      document.getElementById('forgot-step-otp').classList.add('hidden');
+      document.getElementById('forgot-error').innerText = '';
+    }
+
+    function showLoginFromForgot() {
+      document.getElementById('forgot-view').classList.add('hidden');
+      document.getElementById('auth-view').classList.remove('hidden');
+      document.getElementById('forgot-error').innerText = '';
+    }
+
+    async function sendResetOtp() {
+      const email = document.getElementById('forgot-email').value.trim();
+      const errorEl = document.getElementById('forgot-error');
+      errorEl.innerText = '';
+
+      if (!email) {
+        errorEl.innerText = 'Enter your account email.';
+        return;
+      }
+
+      try {
+        await fetch('/api/auth/forgot-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+        showToast('If that email is registered, a code has been sent.');
+        document.getElementById('forgot-step-email').classList.add('hidden');
+        document.getElementById('forgot-step-otp').classList.remove('hidden');
+      } catch (e) {
+        errorEl.innerText = 'Network error. Please try again.';
+      }
+    }
+
+    async function submitResetPassword() {
+      const email = document.getElementById('forgot-email').value.trim();
+      const otp = document.getElementById('reset-otp').value.trim();
+      const newPassword = document.getElementById('reset-new-password').value;
+      const errorEl = document.getElementById('forgot-error');
+      errorEl.innerText = '';
+
+      if (!otp || !newPassword) {
+        errorEl.innerText = 'Enter the code and a new password.';
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/auth/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, otp, new_password: newPassword })
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          errorEl.innerText = err.detail || 'Could not reset password.';
+          return;
+        }
+
+        showToast('Password reset. Please log in.');
+        showLoginFromForgot();
+        document.getElementById('auth-username').value = email;
+        document.getElementById('forgot-email').value = '';
+        document.getElementById('reset-otp').value = '';
+        document.getElementById('reset-new-password').value = '';
+      } catch (e) {
+        errorEl.innerText = 'Network error. Please try again.';
+      }
+    }
+
+    async function generateReview() {
+      const period = document.getElementById('review-period').value;
+      const btn = document.getElementById('generate-review-btn');
+      setButtonLoading(btn, true, 'Generating...', 'Generate Review');
+
+      try {
+        const res = await fetch(REVIEW_GENERATE_URL, {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({ period })
+        });
+
+        if (!res.ok) {
+          showToast('Could not generate review.', 'error');
+          return;
+        }
+
+        const review = await res.json();
+        currentReviewId = review.id;
+        document.getElementById('review-expense').innerText = review.expense_review;
+        document.getElementById('review-income').innerText = review.income_review;
+        document.getElementById('review-savings').innerText = review.savings_advice;
+        document.getElementById('review-result').classList.remove('hidden');
+        showToast('Review generated.');
+      } catch (e) {
+        showToast('Network error. Please try again.', 'error');
+      } finally {
+        setButtonLoading(btn, false, '', 'Generate Review');
+      }
+    }
+
+    async function downloadReviewPdf() {
+      if (!currentReviewId) return;
+      const btn = document.getElementById('download-pdf-btn');
+      setButtonLoading(btn, true, 'Preparing...', 'Download PDF');
+      try {
+        const res = await fetch(`/api/reviews/${currentReviewId}/pdf`, { headers: authHeaders() });
+        if (!res.ok) {
+          showToast('Could not generate PDF.', 'error');
+          return;
+        }
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `finance-analysis-${currentReviewId}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+      } catch (e) {
+        showToast('Network error. Please try again.', 'error');
+      } finally {
+        setButtonLoading(btn, false, '', 'Download PDF');
       }
     }
 

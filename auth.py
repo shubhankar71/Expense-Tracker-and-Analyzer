@@ -1,4 +1,5 @@
 import os
+import secrets
 from datetime import datetime, timedelta
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -44,3 +45,16 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
     if user is None:
         raise credentials_error
     return user
+
+
+def generate_otp() -> str:
+    """Cryptographically-secure 6-digit OTP."""
+    return f"{secrets.randbelow(1_000_000):06d}"
+
+
+def hash_otp(otp: str) -> str:
+    return bcrypt.hashpw(otp.encode(), bcrypt.gensalt()).decode()
+
+
+def verify_otp(otp: str, hashed: str) -> bool:
+    return bcrypt.checkpw(otp.encode(), hashed.encode())

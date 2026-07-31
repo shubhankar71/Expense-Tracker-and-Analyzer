@@ -1,5 +1,6 @@
 import os
 import secrets
+import sys
 from datetime import datetime, timedelta
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -10,7 +11,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from models import User
 
-SECRET_KEY = os.environ.get("SECRET_KEY", "change-this-secret-key")
+_env_secret = os.environ.get("SECRET_KEY")
+if _env_secret:
+    SECRET_KEY = _env_secret
+else:
+    # No hardcoded fallback: a known default secret lets anyone who has read
+    # this source forge a valid JWT for any user ID. Generate a random one
+    # instead so the app is never running with a guessable key, and warn
+    # loudly since this key is per-process — every restart invalidates all
+    # existing tokens, and it won't work across multiple worker processes.
+    SECRET_KEY = secrets.token_hex(32)
+    print(
+        "WARNING: SECRET_KEY environment variable is not set. Using a "
+        "randomly generated key for this process only. All logged-in users "
+        "will be logged out on restart, and this will break if you run "
+        "more than one worker process. Set SECRET_KEY in your environment "
+        "for any real deployment.",
+        file=sys.stderr,
+    )
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
@@ -21,7 +22,7 @@ async def generate_user_review(
 ):
     stats = await compute_period_stats(db, user.id, payload.period)
 
-    review_text = generate_review(
+    review_text = await generate_review(
         stats["period_label"], stats["total_income"], stats["total_expense"],
         stats["balance"], stats["category_breakdown"],
     )
@@ -55,8 +56,7 @@ async def download_review_pdf(
     review = await db.get(Review, review_id)
     if not review or review.user_id != user.id:
         raise HTTPException(status_code=404, detail="Review not found")
-
-    pdf_buffer = build_review_pdf(user, review)
+    pdf_buffer = await run_in_threadpool(build_review_pdf, user, review)
     return StreamingResponse(
         pdf_buffer,
         media_type="application/pdf",

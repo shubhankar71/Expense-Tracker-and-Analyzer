@@ -1,21 +1,21 @@
 import os
 import json
-from openai import OpenAI
+from openai import AsyncOpenAI
 
 from rag import retrieve_relevant_tips
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 
-_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
+_client = AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
 
-def generate_review(period_label: str, total_income: float, total_expense: float,
-                     balance: float, category_breakdown: dict) -> dict:
+async def generate_review(period_label: str, total_income: float, total_expense: float,
+                           balance: float, category_breakdown: dict) -> dict:
     """Calls OpenAI to produce a 3-part financial review. Falls back to a
     simple templated review if no API key is configured or the call fails."""
 
-    relevant_tips = retrieve_relevant_tips(category_breakdown)
+    relevant_tips = await retrieve_relevant_tips(category_breakdown)
 
     if not _client:
         return _fallback_review(total_income, total_expense, balance, category_breakdown, relevant_tips)
@@ -45,7 +45,7 @@ actually relevant to this user's numbers above):
 """
 
     try:
-        response = _client.chat.completions.create(
+        response = await _client.chat.completions.create(
             model=OPENAI_MODEL,
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"},
@@ -62,9 +62,7 @@ actually relevant to this user's numbers above):
 
 
 def _fallback_review(total_income, total_expense, balance, category_breakdown, relevant_tips=None):
-    if relevant_tips is None:
-        relevant_tips = retrieve_relevant_tips(category_breakdown)
-
+    # Pure in-memory logic, no network calls — stays sync on purpose.
     top_category = max(category_breakdown, key=category_breakdown.get) if category_breakdown else None
 
     savings_advice = f"Your balance for this period is Rs.{balance:.2f}. "

@@ -1,4 +1,5 @@
 from datetime import datetime
+import re
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 from review_utils import PERIOD_DAYS
 
@@ -12,6 +13,16 @@ EXPENSE_CATEGORIES = {
     "Other",
 }
 ALLOWED_CATEGORIES = INCOME_CATEGORIES | EXPENSE_CATEGORIES
+
+
+def _validate_password_strength(v: str) -> str:
+    if len(v) < 8:
+        raise ValueError("password must be at least 8 characters long")
+    if not re.search(r"[A-Za-z]", v):
+        raise ValueError("password must contain at least one letter")
+    if not re.search(r"[0-9]", v):
+        raise ValueError("password must contain at least one number")
+    return v
 
 
 class TransactionCreate(BaseModel):
@@ -72,6 +83,11 @@ class UserCreate(BaseModel):
     username: str
     password: str
 
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v):
+        return _validate_password_strength(v)
+
 
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -94,6 +110,11 @@ class ResetPasswordRequest(BaseModel):
     email: EmailStr
     otp: str
     new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, v):
+        return _validate_password_strength(v)
 
 
 class ReviewGenerateRequest(BaseModel):

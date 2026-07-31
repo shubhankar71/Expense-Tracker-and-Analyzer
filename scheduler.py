@@ -26,7 +26,7 @@ async def generate_weekly_reviews_for_active_users():
 
         for user_id in active_user_ids:
             stats = await compute_period_stats(db, user_id, "last_week")
-            review_text = generate_review(
+            review_text = await generate_review(
                 stats["period_label"], stats["total_income"], stats["total_expense"],
                 stats["balance"], stats["category_breakdown"],
             )

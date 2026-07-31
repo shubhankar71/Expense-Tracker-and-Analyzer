@@ -15,11 +15,6 @@ _env_secret = os.environ.get("SECRET_KEY")
 if _env_secret:
     SECRET_KEY = _env_secret
 else:
-    # No hardcoded fallback: a known default secret lets anyone who has read
-    # this source forge a valid JWT for any user ID. Generate a random one
-    # instead so the app is never running with a guessable key, and warn
-    # loudly since this key is per-process — every restart invalidates all
-    # existing tokens, and it won't work across multiple worker processes.
     SECRET_KEY = secrets.token_hex(32)
     print(
         "WARNING: SECRET_KEY environment variable is not set. Using a "

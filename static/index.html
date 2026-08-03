@@ -42,6 +42,7 @@
       padding: 40px;
       background: var(--panel);
       border-left: 1px solid var(--border);
+      overflow-y: auto;
     }
     @media (max-width: 640px) {
       .auth-empty-panel { display: none; }
@@ -130,8 +131,52 @@
     .auth-box h2::before { content: ''; display: inline-block; width: 8px; height: 8px; background: var(--accent); border-radius: 1px; }
     .auth-box .field { margin-bottom: 12px; }
     .auth-box .auth-submit { width: 100%; padding: 11px; }
+    .password-field { position: relative; }
+    .password-field input { padding-right: 42px; }
+    .password-toggle {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      padding: 4px;
+      margin: 0;
+      width: auto;
+      cursor: pointer;
+      font-size: 1rem;
+      line-height: 1;
+      opacity: 0.75;
+    }
+    .password-toggle:hover {
+      color: var(--text);
+      opacity: 1;
+      background: transparent;
+    }
+    .password-toggle:focus-visible {
+      outline: 1px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: 3px;
+    }
     .error-text { color: var(--danger); font-size: 0.82rem; margin-top: 8px; min-height: 1em; }
     .hidden { display: none !important; }
+
+    .password-hint {
+      background: rgba(232,163,61,0.06);
+      border: 1px solid rgba(232,163,61,0.25);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    .password-hint strong { color: var(--text); font-weight: 600; }
+    .password-hint ul { margin: 4px 0 0; padding-left: 18px; }
+    .password-hint li { margin-bottom: 2px; }
+    .password-hint li.met { color: var(--success); }
+    .password-hint li.met::marker { color: var(--success); }
 
     .toast-container { position: fixed; bottom: 22px; right: 22px; display: flex; flex-direction: column; gap: 8px; z-index: 1000; }
     .toast {
@@ -185,8 +230,19 @@
         <div class="field">
           <input type="text" id="auth-username" placeholder="Username or email" autocomplete="username">
         </div>
-        <div class="field">
+
+        <div id="password-hint" class="password-hint hidden">
+          <strong>Password must have:</strong>
+          <ul>
+            <li id="hint-length">At least 8 characters</li>
+            <li id="hint-letter">At least one letter (a-z, A-Z)</li>
+            <li id="hint-number">At least one number (0-9)</li>
+          </ul>
+        </div>
+
+        <div class="field password-field">
           <input type="password" id="auth-password" placeholder="Password" autocomplete="current-password">
+          <button type="button" class="password-toggle" onclick="togglePassword('auth-password', this)" aria-label="Show password" title="Show password">👁</button>
         </div>
         <button id="auth-submit-btn" class="auth-submit" onclick="submitAuth()">Log in</button>
         <div id="auth-error" class="error-text"></div>
@@ -213,8 +269,19 @@
           <div class="field">
             <input type="text" id="reset-otp" placeholder="6-digit code" maxlength="6" inputmode="numeric">
           </div>
-          <div class="field">
+
+          <div class="password-hint">
+            <strong>New password must have:</strong>
+            <ul>
+              <li>At least 8 characters</li>
+              <li>At least one letter (a-z, A-Z)</li>
+              <li>At least one number (0-9)</li>
+            </ul>
+          </div>
+
+          <div class="field password-field">
             <input type="password" id="reset-new-password" placeholder="New password" autocomplete="new-password">
+            <button type="button" class="password-toggle" onclick="togglePassword('reset-new-password', this)" aria-label="Show password" title="Show password">👁</button>
           </div>
           <button class="auth-submit" onclick="submitResetPassword()">Reset password</button>
         </div>
@@ -269,11 +336,7 @@
             <select id="category"></select>
             <div class="field-error" id="category-error"></div>
           </div>
-          <div class="field">
-            <input type="text" id="notes" placeholder="Notes (optional)" maxlength="200">
-          </div>
           <button id="save-btn" onclick="addTransaction()">Save record</button>
-          <button id="cancel-edit-btn" class="secondary hidden" onclick="cancelEdit()">Cancel</button>
         </div>
       </div>
 
@@ -336,15 +399,6 @@
           <button id="download-pdf-btn" class="secondary" style="margin-top:10px;" onclick="downloadReviewPdf()">Download PDF</button>
         </div>
       </div>
-
-      <div class="card">
-        <h3>Past Reviews</h3>
-        <div id="reviews-list-empty" class="empty-state hidden">
-          <div class="icon">—</div>
-          No reviews yet. Generate one above.
-        </div>
-        <div id="reviews-list"></div>
-      </div>
     </div>
   </div>
 
@@ -360,24 +414,25 @@
     let incomeExpenseChart = null;
     let categoryChart = null;
     let currentReviewId = null;
-    let editingTransactionId = null;
-    let currentTransactions = [];
-    let allReviews = [];
 
     const INCOME_CATEGORIES = ['Salary'];
     const EXPENSE_CATEGORIES = ['Rent', 'Grocery', 'Travel Cost', 'Vehicle Repair', 'Health + Medication', 'Other'];
 
     const CHART_COLORS = ['#e8a33d', '#3f8f6f', '#c1503f', '#5b8dd6', '#9b7fd4', '#d4a5c9', '#6fb1a0', '#c98f4f'];
 
-    function escapeHtml(str) {
-      const div = document.createElement('div');
-      div.textContent = str == null ? '' : str;
-      return div.innerHTML;
-    }
-
     function getToken() { return localStorage.getItem('token'); }
     function authHeaders() {
       return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` };
+    }
+
+    function extractErrorMessage(err) {
+      if (typeof err.detail === 'string') {
+        return err.detail;
+      }
+      if (Array.isArray(err.detail)) {
+        return err.detail.map(e => e.msg || String(e)).join(' ');
+      }
+      return 'Something went wrong. Please try again.';
     }
 
     function showToast(message, type = 'success') {
@@ -409,6 +464,13 @@
       document.getElementById('category').classList.remove('invalid');
     }
 
+    function updatePasswordHint() {
+      const value = document.getElementById('auth-password').value;
+      document.getElementById('hint-length').classList.toggle('met', value.length >= 8);
+      document.getElementById('hint-letter').classList.toggle('met', /[A-Za-z]/.test(value));
+      document.getElementById('hint-number').classList.toggle('met', /[0-9]/.test(value));
+    }
+
     function toggleAuthMode() {
       authMode = authMode === 'login' ? 'signup' : 'login';
       document.getElementById('auth-title').innerText = authMode === 'login' ? 'Log in' : 'Sign up';
@@ -417,8 +479,22 @@
       document.querySelector('#auth-view .link-btn').innerText = authMode === 'login' ? 'Sign up' : 'Log in';
       document.getElementById('auth-error').innerText = '';
       document.getElementById('email-field').classList.toggle('hidden', authMode === 'login');
+      document.getElementById('password-hint').classList.toggle('hidden', authMode === 'login');
       document.getElementById('auth-username').placeholder = authMode === 'login' ? 'Username or email' : 'Username';
       document.getElementById('auth-email').value = '';
+      updatePasswordHint();
+    }
+
+    function togglePassword(inputId, button) {
+      const input = document.getElementById(inputId);
+      if (!input) return;
+
+      const showing = input.type === 'password';
+      input.type = showing ? 'text' : 'password';
+
+      button.textContent = showing ? '🙈' : '👁';
+      button.setAttribute('aria-label', showing ? 'Hide password' : 'Show password');
+      button.setAttribute('title', showing ? 'Hide password' : 'Show password');
     }
 
     async function submitAuth() {
@@ -450,7 +526,7 @@
           });
           if (!res.ok) {
             const err = await res.json();
-            errorEl.innerText = err.detail || 'Registration failed.';
+            errorEl.innerText = extractErrorMessage(err);
             return;
           }
         }
@@ -493,7 +569,6 @@
       document.getElementById('user-badge').innerText = localStorage.getItem('username');
       populateCategoryOptions();
       updateDashboard();
-      loadReviewsList();
     }
 
     function setStatsLoading(isLoading) {
@@ -621,7 +696,6 @@
 
         const listRes = await fetch(API_URL, { headers: authHeaders() });
         const transactions = await listRes.json();
-        currentTransactions = transactions;
         const tbody = document.getElementById('transaction-list');
 
         if (transactions.length === 0) {
@@ -636,13 +710,10 @@
           tbody.innerHTML = transactions.slice().reverse().map(t => `
             <tr class="${t.id === lastAddedId ? 'new-row' : ''}">
               <td>${new Date(t.date).toLocaleDateString('en-IN')}</td>
-              <td>${t.category}${t.notes ? `<br><span style="color:var(--text-muted); font-size:0.78rem;">${escapeHtml(t.notes)}</span>` : ''}</td>
+              <td>${t.category}</td>
               <td><span class="badge ${t.type === 'income' ? 'badge-income' : 'badge-expense'}">${t.type.toUpperCase()}</span></td>
               <td>₹${t.amount.toLocaleString()}</td>
-              <td>
-                <button class="secondary" style="padding:6px 10px; font-size:0.78rem; margin-right:6px;" onclick="editTransactionFromList(${t.id})">Edit</button>
-                <button class="delete-btn" onclick="confirmDelete(${t.id})">Delete</button>
-              </td>
+              <td><button class="delete-btn" onclick="confirmDelete(${t.id})">Delete</button></td>
             </tr>
           `).join('');
         }
@@ -682,75 +753,38 @@
       return valid;
     }
 
-    function startEditTransaction(t) {
-      editingTransactionId = t.id;
-      document.getElementById('amount').value = t.amount;
-      document.getElementById('type').value = t.type;
-      populateCategoryOptions();
-      document.getElementById('category').value = t.category;
-      document.getElementById('notes').value = t.notes || '';
-      document.getElementById('save-btn').innerText = 'Update record';
-      document.getElementById('cancel-edit-btn').classList.remove('hidden');
-      document.getElementById('amount-error').innerText = '';
-      document.getElementById('category-error').innerText = '';
-      document.getElementById('amount').classList.remove('invalid');
-      document.getElementById('category').classList.remove('invalid');
-    }
-
-    function editTransactionFromList(id) {
-      const t = currentTransactions.find(tx => tx.id === id);
-      if (!t) return;
-      startEditTransaction(t);
-    }
-
-    function cancelEdit() {
-      editingTransactionId = null;
-      document.getElementById('amount').value = '';
-      document.getElementById('notes').value = '';
-      populateCategoryOptions();
-      document.getElementById('save-btn').innerText = 'Save record';
-      document.getElementById('cancel-edit-btn').classList.add('hidden');
-      document.getElementById('amount-error').innerText = '';
-      document.getElementById('category-error').innerText = '';
-      document.getElementById('amount').classList.remove('invalid');
-      document.getElementById('category').classList.remove('invalid');
-    }
-
     async function addTransaction() {
       const amount = parseFloat(document.getElementById('amount').value);
       const category = document.getElementById('category').value.trim();
       const type = document.getElementById('type').value;
-      const notes = document.getElementById('notes').value.trim();
 
       if (!validateTransactionForm(amount, category)) return;
 
-      const isEditing = editingTransactionId !== null;
-      const url = isEditing ? `${API_URL}/${editingTransactionId}` : API_URL;
-      const method = isEditing ? 'PUT' : 'POST';
-
       const saveBtn = document.getElementById('save-btn');
-      setButtonLoading(saveBtn, true, isEditing ? 'Updating...' : 'Saving...', isEditing ? 'Update record' : 'Save record');
+      setButtonLoading(saveBtn, true, 'Saving...', 'Save record');
 
       try {
-        const res = await fetch(url, {
-          method,
+        const res = await fetch(API_URL, {
+          method: 'POST',
           headers: authHeaders(),
-          body: JSON.stringify({ amount, type, category, notes })
+          body: JSON.stringify({ amount, type, category })
         });
 
         if (res.ok) {
-          const saved = await res.json();
-          lastAddedId = saved.id;
-          showToast(isEditing ? 'Transaction updated.' : 'Transaction saved.');
-          cancelEdit();
+          const created = await res.json();
+          lastAddedId = created.id;
+          document.getElementById('amount').value = '';
+          populateCategoryOptions();
+          showToast('Transaction saved.');
           updateDashboard();
         } else {
-          showToast(isEditing ? 'Could not update transaction. Check your input.' : 'Could not save transaction. Check your input.', 'error');
+          const err = await res.json();
+          showToast(extractErrorMessage(err) || 'Could not save transaction.', 'error');
         }
       } catch (e) {
         showToast('Network error. Please try again.', 'error');
       } finally {
-        setButtonLoading(saveBtn, false, '', editingTransactionId !== null ? 'Update record' : 'Save record');
+        setButtonLoading(saveBtn, false, '', 'Save record');
       }
     }
 
@@ -851,7 +885,7 @@
 
         if (!res.ok) {
           const err = await res.json();
-          errorEl.innerText = err.detail || 'Could not reset password.';
+          errorEl.innerText = extractErrorMessage(err);
           return;
         }
 
@@ -879,7 +913,8 @@
         });
 
         if (!res.ok) {
-          showToast('Could not generate review.', 'error');
+          const err = await res.json();
+          showToast(extractErrorMessage(err) || 'Could not generate review.', 'error');
           return;
         }
 
@@ -890,58 +925,11 @@
         document.getElementById('review-savings').innerText = review.savings_advice;
         document.getElementById('review-result').classList.remove('hidden');
         showToast('Review generated.');
-        loadReviewsList();
       } catch (e) {
         showToast('Network error. Please try again.', 'error');
       } finally {
         setButtonLoading(btn, false, '', 'Generate Review');
       }
-    }
-
-    async function loadReviewsList() {
-      try {
-        const res = await fetch('/api/reviews', { headers: authHeaders() });
-        if (!res.ok) return;
-        const reviews = await res.json();
-        allReviews = reviews;
-
-        const container = document.getElementById('reviews-list');
-        const emptyEl = document.getElementById('reviews-list-empty');
-
-        if (reviews.length === 0) {
-          container.innerHTML = '';
-          emptyEl.classList.remove('hidden');
-          return;
-        }
-        emptyEl.classList.add('hidden');
-
-        container.innerHTML = reviews.map(r => `
-          <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid var(--border);">
-            <div>
-              <div style="font-weight:600; font-size:0.9rem;">${escapeHtml(r.period_label)}</div>
-              <div style="color:var(--text-muted); font-size:0.78rem; margin-top:2px;">
-                ${new Date(r.generated_at).toLocaleDateString('en-IN')}
-                ${r.is_auto_generated ? '<span class="badge" style="margin-left:6px; border-color:var(--border); color:var(--text-muted);">AUTO</span>' : ''}
-              </div>
-            </div>
-            <button class="secondary" style="padding:6px 12px; font-size:0.8rem;" onclick="viewReview(${r.id})">View</button>
-          </div>
-        `).join('');
-      } catch (e) {
-        // Reviews list is supplementary to the main dashboard — fail quietly
-        // rather than toast-spamming on every load.
-      }
-    }
-
-    function viewReview(id) {
-      const review = allReviews.find(r => r.id === id);
-      if (!review) return;
-      currentReviewId = review.id;
-      document.getElementById('review-expense').innerText = review.expense_review;
-      document.getElementById('review-income').innerText = review.income_review;
-      document.getElementById('review-savings').innerText = review.savings_advice;
-      document.getElementById('review-result').classList.remove('hidden');
-      document.getElementById('review-result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
     async function downloadReviewPdf() {
@@ -973,6 +961,7 @@
     document.getElementById('auth-password').addEventListener('keydown', e => {
       if (e.key === 'Enter') submitAuth();
     });
+    document.getElementById('auth-password').addEventListener('input', updatePasswordHint);
     document.getElementById('category').addEventListener('keydown', e => {
       if (e.key === 'Enter') addTransaction();
     });

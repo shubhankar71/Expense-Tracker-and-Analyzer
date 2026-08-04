@@ -10,6 +10,5 @@ python-multipart
 openai
 reportlab
 matplotlib
-apscheduler
 slowapi
 httpx==0.27.2

@@ -1,6 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
-from fastapi.concurrency import run_in_threadpool
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
@@ -9,7 +7,6 @@ from schemas import ReviewGenerateRequest, ReviewOut
 from auth import get_current_user
 from llm_review import generate_review
 from review_utils import compute_period_stats
-from pdf_report import build_review_pdf
 
 router = APIRouter(prefix="/api/reviews", tags=["reviews"])
 
@@ -45,20 +42,3 @@ async def generate_user_review(
     await db.commit()
     await db.refresh(review)
     return review
-
-
-@router.get("/{review_id}/pdf")
-async def download_review_pdf(
-    review_id: int,
-    db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    review = await db.get(Review, review_id)
-    if not review or review.user_id != user.id:
-        raise HTTPException(status_code=404, detail="Review not found")
-    pdf_buffer = await run_in_threadpool(build_review_pdf, user, review)
-    return StreamingResponse(
-        pdf_buffer,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="finance-analysis-{review_id}.pdf"'},
-    )

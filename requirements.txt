@@ -8,7 +8,5 @@ python-jose[cryptography]
 bcrypt
 python-multipart
 openai
-reportlab
-matplotlib
 slowapi
 httpx==0.27.2

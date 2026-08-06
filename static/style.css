@@ -269,9 +269,15 @@ tr.new-row td { animation: highlight 1.4s ease; }
 .landing-nav {
   background: #0d0d0d;
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
   padding: 14px clamp(48px, 9vw, 140px);
+}
+.nav-brand {
+  font-family: var(--land-serif);
+  font-weight: 600;
+  font-size: clamp(1.1rem, 1.6vw, 1.3rem);
+  color: #f5f5f5;
 }
 .nav-login-btn {
   font-family: var(--land-sans);

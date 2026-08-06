@@ -181,6 +181,25 @@ function closeAuthDrawer() {
   document.body.style.overflow = '';
 }
 
+// Let Enter submit whichever form is currently showing in the drawer,
+// instead of requiring a mouse click on the button.
+document.getElementById('auth-drawer').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' || e.target.tagName === 'BUTTON') return;
+
+  const forgotViewActive = !document.getElementById('forgot-view').classList.contains('hidden');
+  if (!forgotViewActive) {
+    submitAuth();
+    return;
+  }
+
+  const otpStepActive = !document.getElementById('forgot-step-otp').classList.contains('hidden');
+  if (otpStepActive) {
+    submitResetPassword();
+  } else {
+    sendResetOtp();
+  }
+});
+
 async function fetchCurrentUser() {
   try {
     const res = await fetch('/api/auth/me', { headers: authHeaders() });
@@ -207,6 +226,15 @@ function showDashboard() {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') closeAuthDrawer();
 });
+
+// Restore the session on page load / reopen instead of always starting at the
+// landing page. The token lives in localStorage, which (unlike sessionStorage)
+// survives reloads and closing the tab. If the token has actually expired,
+// updateDashboard()'s existing 401 check inside showDashboard() will catch it
+// and fall back to logout() automatically.
+if (getToken()) {
+  showDashboard();
+}
 
 function setStatsLoading(isLoading) {
   ['total-income', 'total-expense', 'balance'].forEach(id => {

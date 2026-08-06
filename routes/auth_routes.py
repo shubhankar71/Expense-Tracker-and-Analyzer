@@ -1,4 +1,3 @@
-from fastapi.concurrency import run_in_threadpool
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordRequestForm
@@ -80,7 +79,7 @@ async def forgot_password(request: Request, payload: ForgotPasswordRequest, db: 
         )
         db.add(record)
         await db.commit()
-        await run_in_threadpool(send_otp_email, user.email, otp)
+        await send_otp_email(user.email, otp)
 
     return {"message": "If that email is registered, an OTP has been sent."}
 

@@ -80,7 +80,7 @@ async def forgot_password(request: Request, payload: ForgotPasswordRequest, db: 
         )
         db.add(record)
         await db.commit()
-        send_otp_email(user.email, otp)
+        await run_in_threadpool(send_otp_email, user.email, otp)
 
     return {"message": "If that email is registered, an OTP has been sent."}
 

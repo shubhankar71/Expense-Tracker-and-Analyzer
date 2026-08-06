@@ -3,91 +3,150 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Finance Tracker | Dashboard</title>
+  <title>Finance Tracker</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500;1,600&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v=2">
 </head>
 <body>
 
-  <div id="auth-screen" class="auth-screen">
-    <div class="auth-empty-panel"></div>
-    <div class="auth-form-panel">
-      <div id="auth-view" class="auth-box">
-        <h2 id="auth-title">Log in</h2>
-        <div class="field hidden" id="email-field">
-          <input type="email" id="auth-email" placeholder="Email" autocomplete="email">
+  <div id="landing-page">
+    <nav class="landing-nav">
+      <button class="nav-login-btn" onclick="openAuthDrawer('login')">Log in</button>
+    </nav>
+
+    <section class="landing-hero">
+      <h1 class="hero-title">Finance<br>Tracker</h1>
+      <p class="hero-eyebrow"><i>Take Control of Your Money</i></p>
+      <p class="hero-sub">Spend smarter. Save better. Know where your money goes.</p>
+    </section>
+
+    <section class="landing-glance">
+      <div class="glance-grid">
+        <h2 class="glance-heading">Your Finances,<br>At a Glance</h2>
+        <div class="glance-list">
+          <p class="glance-intro">See everything that matters in one place:</p>
+          <ul>
+            <li><span class="glance-icon">💰</span> Total Balance</li>
+            <li><span class="glance-icon">📈</span> Monthly Income</li>
+            <li><span class="glance-icon">📉</span> Monthly Expenses</li>
+            <li><span class="glance-icon">🎯</span> Savings Progress</li>
+            <li><span class="glance-icon">📋</span> Recent Transactions</li>
+            <li><span class="glance-icon">📊</span> Spending by Category</li>
+          </ul>
         </div>
+      </div>
+      <p class="landing-quote">&ldquo;Track with intention. Spend with purpose. Save for what matters&rdquo;</p>
+    </section>
+
+    <section class="landing-how">
+      <div class="how-grid">
+        <h2 class="how-heading">How it<br>works&hellip;.</h2>
+        <div class="how-list">
+          <div class="how-item">
+            <h3>Add your transactions</h3>
+            <p>Record your income and expenses as they happen. Keep everything organized in one place.</p>
+          </div>
+          <div class="how-item">
+            <h3>Organize your spending</h3>
+            <p>Categorize transactions to understand your spending patterns.</p>
+          </div>
+          <div class="how-item">
+            <h3>Track your progress</h3>
+            <p>Use summaries and visual insights to see how you're managing your money.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="landing-closing">
+      <p class="closing-quote">Your money tells a story.<br>We help you understand it.</p>
+      <p class="closing-sub">From your everyday coffee to your biggest monthly expense, Finance Tracker gives you a clearer picture of your financial habits.</p>
+      <button class="cta-btn" onclick="openAuthDrawer()">Get Started</button>
+    </section>
+  </div>
+
+  <!-- ===================== AUTH DRAWER ===================== -->
+  <div id="auth-overlay" class="auth-overlay" onclick="closeAuthDrawer()"></div>
+
+  <div id="auth-drawer" class="auth-drawer">
+    <button type="button" class="auth-drawer-close" onclick="closeAuthDrawer()" aria-label="Close">✕</button>
+
+    <div id="auth-view" class="auth-box">
+      <h2 id="auth-title">Log in</h2>
+      <div class="field hidden" id="email-field">
+        <input type="email" id="auth-email" placeholder="Email" autocomplete="email">
+      </div>
+      <div class="field">
+        <input type="text" id="auth-username" placeholder="Username or email" autocomplete="username">
+      </div>
+
+      <div id="password-hint" class="password-hint hidden">
+        <strong>Password must have:</strong>
+        <ul>
+          <li id="hint-length">At least 8 characters</li>
+          <li id="hint-letter">At least one letter (a-z, A-Z)</li>
+          <li id="hint-number">At least one number (0-9)</li>
+        </ul>
+      </div>
+
+      <div class="field password-field">
+        <input type="password" id="auth-password" placeholder="Password" autocomplete="current-password">
+        <button type="button" class="password-toggle" onclick="togglePassword('auth-password', this)" aria-label="Show password" title="Show password">👁</button>
+      </div>
+      <button id="auth-submit-btn" class="auth-submit" onclick="submitAuth()">Log in</button>
+      <div id="auth-error" class="error-text"></div>
+      <p style="margin-top:14px; font-size:0.85rem; color:var(--text-muted);">
+        <span id="auth-toggle-text">Don't have an account?</span>
+        <button class="link-btn" onclick="toggleAuthMode()">Sign up</button>
+      </p>
+      <p id="forgot-password-link" style="margin-top:6px; font-size:0.85rem;">
+        <button class="link-btn" onclick="showForgotPassword()">Forgot password?</button>
+      </p>
+    </div>
+
+    <div id="forgot-view" class="auth-box hidden">
+      <h2>Reset password</h2>
+
+      <div id="forgot-step-email">
         <div class="field">
-          <input type="text" id="auth-username" placeholder="Username or email" autocomplete="username">
+          <input type="email" id="forgot-email" placeholder="Your account email" autocomplete="email">
+        </div>
+        <button class="auth-submit" onclick="sendResetOtp()">Send reset code</button>
+      </div>
+
+      <div id="forgot-step-otp" class="hidden">
+        <div class="field">
+          <input type="text" id="reset-otp" placeholder="6-digit code" maxlength="6" inputmode="numeric">
         </div>
 
-        <div id="password-hint" class="password-hint hidden">
-          <strong>Password must have:</strong>
+        <div class="password-hint">
+          <strong>New password must have:</strong>
           <ul>
-            <li id="hint-length">At least 8 characters</li>
-            <li id="hint-letter">At least one letter (a-z, A-Z)</li>
-            <li id="hint-number">At least one number (0-9)</li>
+            <li>At least 8 characters</li>
+            <li>At least one letter (a-z, A-Z)</li>
+            <li>At least one number (0-9)</li>
           </ul>
         </div>
 
         <div class="field password-field">
-          <input type="password" id="auth-password" placeholder="Password" autocomplete="current-password">
-          <button type="button" class="password-toggle" onclick="togglePassword('auth-password', this)" aria-label="Show password" title="Show password">👁</button>
+          <input type="password" id="reset-new-password" placeholder="New password" autocomplete="new-password">
+          <button type="button" class="password-toggle" onclick="togglePassword('reset-new-password', this)" aria-label="Show password" title="Show password">👁</button>
         </div>
-        <button id="auth-submit-btn" class="auth-submit" onclick="submitAuth()">Log in</button>
-        <div id="auth-error" class="error-text"></div>
-        <p style="margin-top:14px; font-size:0.85rem; color:var(--text-muted);">
-          <span id="auth-toggle-text">Don't have an account?</span>
-          <button class="link-btn" onclick="toggleAuthMode()">Sign up</button>
-        </p>
-        <p id="forgot-password-link" style="margin-top:6px; font-size:0.85rem;">
-          <button class="link-btn" onclick="showForgotPassword()">Forgot password?</button>
-        </p>
+        <button class="auth-submit" onclick="submitResetPassword()">Reset password</button>
       </div>
 
-      <div id="forgot-view" class="auth-box hidden">
-        <h2>Reset password</h2>
-
-        <div id="forgot-step-email">
-          <div class="field">
-            <input type="email" id="forgot-email" placeholder="Your account email" autocomplete="email">
-          </div>
-          <button class="auth-submit" onclick="sendResetOtp()">Send reset code</button>
-        </div>
-
-        <div id="forgot-step-otp" class="hidden">
-          <div class="field">
-            <input type="text" id="reset-otp" placeholder="6-digit code" maxlength="6" inputmode="numeric">
-          </div>
-
-          <div class="password-hint">
-            <strong>New password must have:</strong>
-            <ul>
-              <li>At least 8 characters</li>
-              <li>At least one letter (a-z, A-Z)</li>
-              <li>At least one number (0-9)</li>
-            </ul>
-          </div>
-
-          <div class="field password-field">
-            <input type="password" id="reset-new-password" placeholder="New password" autocomplete="new-password">
-            <button type="button" class="password-toggle" onclick="togglePassword('reset-new-password', this)" aria-label="Show password" title="Show password">👁</button>
-          </div>
-          <button class="auth-submit" onclick="submitResetPassword()">Reset password</button>
-        </div>
-
-        <div id="forgot-error" class="error-text"></div>
-        <p style="margin-top:14px; font-size:0.85rem;">
-          <button class="link-btn" onclick="showLoginFromForgot()">Back to log in</button>
-        </p>
-      </div>
+      <div id="forgot-error" class="error-text"></div>
+      <p style="margin-top:14px; font-size:0.85rem;">
+        <button class="link-btn" onclick="showLoginFromForgot()">Back to log in</button>
+      </p>
     </div>
   </div>
 
-  <div class="container">
+  <!-- ===================== DASHBOARD ===================== -->
+  <div class="container hidden" id="dashboard-container">
     <div id="dashboard-view" class="hidden">
       <div class="header no-print">
         <h1>Finance Tracker</h1>
@@ -206,6 +265,6 @@
 
   <div class="toast-container no-print" id="toast-container"></div>
 
-  <script src="/static/script.js"></script>
+  <script src="/static/script.js?v=2"></script>
 </body>
 </html>

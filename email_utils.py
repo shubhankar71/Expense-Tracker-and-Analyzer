@@ -1,42 +1,52 @@
 import os
-import smtplib
 import logging
-from email.mime.text import MIMEText
+import httpx
 
 logger = logging.getLogger(__name__)
 
-SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
-SMTP_USER = os.environ.get("SMTP_USER")
-SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD")
-SMTP_FROM = os.environ.get("SMTP_FROM", SMTP_USER)
-SMTP_TIMEOUT_SECONDS = int(os.environ.get("SMTP_TIMEOUT_SECONDS", "10"))
+SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
+EMAIL_FROM = os.environ.get("EMAIL_FROM")
+SENDGRID_TIMEOUT_SECONDS = int(os.environ.get("SENDGRID_TIMEOUT_SECONDS", "10"))
+
+SENDGRID_URL = "https://api.sendgrid.com/v3/mail/send"
 
 
-def send_otp_email(to_email: str, otp: str) -> bool:
-    """Sends the OTP email. Returns True/False, never raises — a broken
-    mail server should never crash the reset flow or leak whether an
-    email is registered via an error response."""
+async def send_otp_email(to_email: str, otp: str) -> bool:
+    """Sends the OTP email via SendGrid's HTTP API (port 443 — works even
+    on hosts like Render that block outbound SMTP ports 25/465/587).
+    Returns True/False, never raises, so a failed send never crashes the
+    reset flow or leaks whether an email is registered."""
     subject = "Your Finance Tracker password reset code"
     body = (
         f"Your password reset code is: {otp}\n\n"
         f"This code expires in 10 minutes. If you didn't request this, you can ignore this email."
     )
 
-    if not SMTP_USER or not SMTP_PASSWORD:
+    if not SENDGRID_API_KEY or not EMAIL_FROM:
+        # Dev fallback so the flow still works without SendGrid configured.
         print(f"[DEV EMAIL] To: {to_email} | OTP: {otp}")
         return True
 
-    msg = MIMEText(body)
-    msg["Subject"] = subject
-    msg["From"] = SMTP_FROM
-    msg["To"] = to_email
+    payload = {
+        "personalizations": [{"to": [{"email": to_email}]}],
+        "from": {"email": EMAIL_FROM},
+        "subject": subject,
+        "content": [{"type": "text/plain", "value": body}],
+    }
+    headers = {
+        "Authorization": f"Bearer {SENDGRID_API_KEY}",
+        "Content-Type": "application/json",
+    }
 
     try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=SMTP_TIMEOUT_SECONDS) as server:
-            server.starttls()
-            server.login(SMTP_USER, SMTP_PASSWORD)
-            server.sendmail(SMTP_FROM, [to_email], msg.as_string())
+        async with httpx.AsyncClient(timeout=SENDGRID_TIMEOUT_SECONDS) as client:
+            response = await client.post(SENDGRID_URL, json=payload, headers=headers)
+        if response.status_code >= 400:
+            logger.error(
+                "SendGrid rejected OTP email to %s: %s %s",
+                to_email, response.status_code, response.text,
+            )
+            return False
         return True
     except Exception:
         logger.exception("Failed to send OTP email to %s", to_email)

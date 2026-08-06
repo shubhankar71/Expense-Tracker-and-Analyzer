@@ -146,16 +146,39 @@ async function submitAuth() {
   }
 }
 
+function setHidden(id, hidden) {
+  const el = document.getElementById(id);
+  if (!el) {
+    console.warn(`setHidden: no element with id "${id}" — is index.html out of sync with script.js?`);
+    return;
+  }
+  el.classList.toggle('hidden', hidden);
+}
+
 function logout() {
   localStorage.removeItem('token');
   localStorage.removeItem('username');
   currentUser = null;
-  document.getElementById('auth-screen').classList.remove('hidden');
-  document.getElementById('dashboard-view').classList.add('hidden');
+  setHidden('landing-page', false);
+  setHidden('dashboard-container', true);
+  setHidden('dashboard-view', true);
   document.getElementById('auth-username').value = '';
   document.getElementById('auth-password').value = '';
   document.getElementById('auth-email').value = '';
   showLoginFromForgot();
+  closeAuthDrawer();
+}
+
+function openAuthDrawer() {
+  document.getElementById('auth-overlay').classList.add('open');
+  document.getElementById('auth-drawer').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeAuthDrawer() {
+  document.getElementById('auth-overlay').classList.remove('open');
+  document.getElementById('auth-drawer').classList.remove('open');
+  document.body.style.overflow = '';
 }
 
 async function fetchCurrentUser() {
@@ -170,13 +193,20 @@ async function fetchCurrentUser() {
 }
 
 function showDashboard() {
-  document.getElementById('auth-screen').classList.add('hidden');
-  document.getElementById('dashboard-view').classList.remove('hidden');
+  closeAuthDrawer();
+  setHidden('landing-page', true);
+  setHidden('dashboard-container', false);
+  setHidden('dashboard-view', false);
   document.getElementById('user-badge').innerText = localStorage.getItem('username');
   populateCategoryOptions();
   fetchCurrentUser();
   updateDashboard();
 }
+
+// Close the drawer with the Escape key, same as clicking the overlay.
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeAuthDrawer();
+});
 
 function setStatsLoading(isLoading) {
   ['total-income', 'total-expense', 'balance'].forEach(id => {
